@@ -1,0 +1,108 @@
+---
+title: "SMS Spam ham classifier"
+author: "Shobhit Tiwari"
+date: "January 14, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(quanteda)
+library(RColorBrewer)
+library(caret)
+```
+
+## Synopsis
+
+In this project we will classify sms into spam and ham using naive bayes classifier. 
+We will use sms spam data from kaggle dataset(Spam Text Message Classification) to train the classifier. 
+
+## Data
+
+We will download and load data in a dataframe from
+https://www.kaggle.com/team-ai/spam-text-message-classification/data
+
+
+```{r data}
+set.seed(1222)
+data <- read.csv('data.csv',stringsAsFactors = FALSE, header = TRUE)
+data <- data[sample(nrow(data)),]
+names(data)
+```
+
+Now lets build a corpus of the messages using quanteda package for the text field and attach the labels as doc vars. 
+
+
+```{r}
+data.corpus <- corpus(data$Message)
+docvars(data.corpus, "Category") <- data$Category
+
+```
+
+We will subset corpus for spam and ham and create dfm for both sets.  
+
+
+```{r}
+
+spam.dfm <- dfm(corpus_subset(data.corpus, Category == "spam"), tolower = TRUE, remove_numbers = TRUE,  remove = stopwords("SMART"),stem = TRUE, remove_punct = TRUE) 
+
+ham.dfm <- dfm(corpus_subset(data.corpus, Category == "ham"),tolower =  TRUE , remove_numbers = TRUE,   remove = stopwords("SMART"),stem = TRUE, remove_punct = TRUE) 
+
+```
+
+
+Lets see the wordclod for both these to explore most frequent words in both 
+
+
+```{r warning = FALSE}
+
+textplot_wordcloud(ham.dfm, min.freq = 16, random.order = FALSE,
+                   rot.per = .25, 
+                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+
+textplot_wordcloud(spam.dfm, min.freq = 16, random.order = FALSE,
+                   rot.per = .25, 
+                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+
+
+```
+
+
+We can see that in spam set most frequest words are call, free , prize etc which is typical of spams.
+And most frequent words in ham dataset is call, good, love etc. 
+
+
+Now we will partition the sms data into training and test sets.
+
+```{r}
+data.dfm <- dfm(data.corpus, tolower= TRUE)
+data.dfm <- dfm_trim(data.dfm, min_count = 4, min_docfreq = 3)
+data.dfm <- dfm_weight(data.dfm, type = "tfidf")
+
+data.train <- data[1:4738,]  
+data.test <- data[4739:nrow(data),]
+
+data.dfm.train <- data.dfm[1:4738,]  
+data.dfm.test <- data.dfm[4739:nrow(data),] 
+
+```
+
+We will now traing our model using naive bais classification 
+
+```{r}
+set.seed(12334)
+data.model <- textmodel_nb(data.dfm.train, data.train$Category)  
+data.prediction <-  predict(data.model, newdata = data.dfm.test)
+table(data.prediction$nb.predicted, data.test$Category)
+```
+
+
+So the model is predicting 99 % ham messages correctly. 
+And the model is predicting 90 % spam messages correctly. 
+
+
+##Conclusion 
+
+So we can see that text analysis can be done using quanteda package pretty easily with surprisingly good results. 
+
+
